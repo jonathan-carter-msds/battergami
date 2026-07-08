@@ -1,0 +1,6 @@
+battergami.db
+run_battergami.sh
+__pycache__/
+*.pyc
+retrosheet_csvs/
+retrosheet_basiccsvs.zip
