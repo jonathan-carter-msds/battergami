@@ -389,7 +389,7 @@ def draft_no_battergami_tweet(row: sqlite3.Row, rank: int = 1) -> str:
         f"{header}\n\n"
         f"{row['player_name']} | {matchup}\n\n"
         f"{line}\n\n"
-        f"This stat line has been thrown {times} {times_word} before. "
+        f"This stat line has been posted {times} {times_word} before. "
         f"The last time this happened was on {row['last_occurrence_date']} "
         f"by {row['last_occurrence_player']}."
     )
