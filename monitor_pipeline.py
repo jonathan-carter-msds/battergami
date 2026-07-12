@@ -36,9 +36,9 @@ from datetime import datetime, timedelta
 import requests
 
 LOG_PATH = os.environ.get("BATTERGAMI_LOG", "pipeline.log")
-NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "CHANGE-ME-battergami-alerts")
+NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "battergami-alerts-jc4471")
 
-# Cron's active window is 13:00-02:00 (see run_battergami.sh schedule).
+# Cron's active window is 12:00-01:00 (see run_battergami.sh schedule).
 # If we're inside that window and no run has happened in the last
 # MAX_GAP_MINUTES, something's wrong (cron not firing, laptop asleep, etc.)
 MAX_GAP_MINUTES = 90
@@ -140,7 +140,7 @@ def check():
 
     now = datetime.now()
     hour = now.hour
-    in_active_window = (13 <= hour <= 23) or (0 <= hour <= 2)
+    in_active_window = (12 <= hour <= 23) or (0 <= hour <= 1)
 
     if in_active_window:
         gap = now - last_run_time
