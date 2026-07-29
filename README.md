@@ -1,8 +1,14 @@
 # battergami
 
-Tweets when a batter posts an exact box-score line (AB, R, H, 2B, 3B, HR, BB,
-SO, RBI, SB) that has never occurred before in MLB history — the batter
-analog of `pitchergami`.
+Every MLB batter's plate appearance produces a line of ten stats — at-bats,
+runs, hits, doubles, triples, home runs, walks, strikeouts, RBIs, and stolen
+bases. Battergami watches every game and checks that line against every
+batting performance in MLB history, going back to 1898. When a player posts a
+combination of those ten numbers that has *never happened before* — not once,
+in over 125 years of professional baseball — the bot tweets it automatically.
+It's a small, obsessive piece of software whose only job is to notice the
+exact moment baseball does something it has never done. (The batter analog
+of `pitchergami`.)
 
 ## How it decides "never happened before"
 
