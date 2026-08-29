@@ -10,6 +10,7 @@ It's a small, obsessive piece of software whose only job is to notice the
 exact moment baseball does something it has never done. (The batter analog
 of `pitchergami`.)
 
+![Example detection tweet — Francisco Lindor](assets/caglianone_battergami.png)
 ![Example detection tweet — Alec Bohm](assets/bohm_battergami.png)
 ![Example detection tweet — Francisco Lindor](assets/lindor_battergami.png)
 
