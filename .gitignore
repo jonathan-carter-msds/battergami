@@ -6,3 +6,5 @@ retrosheet_csvs/
 retrosheet_basiccsvs.zip
 pipeline.log
 monitor.log
+.DS_Store
+crontab_backup_*.txt
