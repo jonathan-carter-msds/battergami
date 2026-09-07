@@ -38,10 +38,10 @@ function tile(n, k) {
   try {
     const s = await fetchJSON("data/summary.json");
     document.getElementById("tiles").innerHTML =
-      tile(commas(s.distinct_lines), "unique lines on record") +
-      tile(ordinal(s.season_count), `battergami of ${s.season_year}`) +
-      tile(commas(s.posted_total), "posted all-time") +
-      tile(commas(s.total_games_scanned), "batter-games scanned") +
+      tile(commas(s.distinct_lines), "battergamis all-time") +
+      tile(commas(s.season_count), `battergamis in ${s.season_year}`) +
+      tile(s.last_event ? fmtDate(s.last_event.date) : "—", "most recent") +
+      tile(commas(s.total_games_scanned), "batter-games checked") +
       tile(s.coverage_start.slice(0,4) + "–" + s.coverage_end.slice(0,4), "seasons covered");
     genLine(document.getElementById("gen"), s.generated_at);
   } catch (e) {
@@ -50,7 +50,7 @@ function tile(n, k) {
 
   const card = (ev) => {
     const nth = ev.type === "battergami" && ev.nth
-      ? `${ordinal(ev.nth)} of ${ev.year} · ` : "";
+      ? `#${ev.nth} of ${ev.year} · ` : "";
     const link = ev.tweet_url
       ? `<a href="${ev.tweet_url}" target="_blank" rel="noopener">tweet &#8599;</a>` : "";
     return `<div class="card">
