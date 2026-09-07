@@ -16,10 +16,11 @@ ONE-TIME SETUP (do this before relying on it):
     1. Install the "ntfy" app from the App Store (free), or use ntfy.sh in
        a browser.
     2. Pick a topic name that's hard for a stranger to guess, since anyone
-       who knows your topic name could theoretically post to it too --
-       e.g. "battergami-alerts-jc4471" rather than something generic.
+       who knows your topic name could read and post to it -- e.g.
+       "battergami-alerts-" plus a long random string, not something generic.
     3. In the app, subscribe to that exact topic name.
-    4. Set NTFY_TOPIC below (or as an environment variable) to that same name.
+    4. Set NTFY_TOPIC as an environment variable to that name. Don't hardcode
+       it here -- this file is committed to a public repo.
     5. Test it once manually: python monitor_pipeline.py --test
        You should get a phone notification within a few seconds.
 
@@ -36,7 +37,10 @@ from datetime import datetime, timedelta
 import requests
 
 LOG_PATH = os.environ.get("BATTERGAMI_LOG", "pipeline.log")
-NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "battergami-alerts-jc4471")
+# ntfy.sh topics are unauthenticated: anyone who knows the name can read and
+# post to it. Keep the real one out of this (public) file -- set NTFY_TOPIC in
+# the environment (e.g. in the gitignored run_battergami.sh or the crontab).
+NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "battergami-alerts-CHANGEME")
 
 # Cron's active window is 12:00-01:00 (see run_battergami.sh schedule).
 # If we're inside that window and no run has happened in the last
