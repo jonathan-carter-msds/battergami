@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Battergami — MLB batting lines that have never happened</title>
+<meta name="description" content="Battergami watches every MLB game and flags batting lines that have never occurred before in over 125 years of baseball.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>Every batting line baseball has never seen</h1>
+  <p class="sub">Every plate-appearance box score is ten numbers: AB, R, H, 2B, 3B, HR, BB, SO, RBI, SB.
+     Battergami checks each one against every batter-game since 1898. When a combination
+     has <em>never happened before</em>, <a href="https://x.com/battergami" target="_blank" rel="noopener">@battergami</a> tweets it.</p>
+
+  <div class="tiles" id="tiles"></div>
+
+  <h2>Latest battergamis</h2>
+  <div class="feed" id="feed"><div class="spinner">Loading…</div></div>
+
+  <h2>Recent near-misses</h2>
+  <p class="sub">Days with no battergami — the rarest line that <em>did</em> get posted.</p>
+  <div class="feed" id="misses"><div class="spinner">Loading…</div></div>
+
+  <p class="gen" id="gen"></p>
+</div>
+
+<script src="assets/app.js"></script>
+<script>
+renderNav("index.html");
+
+function tile(n, k) {
+  return `<div class="tile"><div class="n">${n}</div><div class="k">${k}</div></div>`;
+}
+
+(async () => {
+  try {
+    const s = await fetchJSON("data/summary.json");
+    document.getElementById("tiles").innerHTML =
+      tile(commas(s.distinct_lines), "unique lines on record") +
+      tile(ordinal(s.season_count), `battergami of ${s.season_year}`) +
+      tile(commas(s.posted_total), "posted all-time") +
+      tile(commas(s.total_games_scanned), "batter-games scanned") +
+      tile(s.coverage_start.slice(0,4) + "–" + s.coverage_end.slice(0,4), "seasons covered");
+    genLine(document.getElementById("gen"), s.generated_at);
+  } catch (e) {
+    document.getElementById("tiles").innerHTML = `<p class="muted">Couldn't load summary.</p>`;
+  }
+
+  const card = (ev) => {
+    const nth = ev.type === "battergami" && ev.nth
+      ? `${ordinal(ev.nth)} of ${ev.year} · ` : "";
+    const link = ev.tweet_url
+      ? `<a href="${ev.tweet_url}" target="_blank" rel="noopener">tweet &#8599;</a>` : "";
+    return `<div class="card">
+      <div class="top">
+        <span class="who">${esc(ev.player)}</span>
+        <span class="meta">${fmtDate(ev.date)}</span>
+      </div>
+      <span class="line">${fmtLine(ev.line)}</span>
+      <div class="foot">${nth}${esc(ev.matchup)}${link ? " · " + link : ""}</div>
+    </div>`;
+  };
+
+  try {
+    const d = await fetchJSON("data/latest.json");
+    const bg = d.events.filter(e => e.type === "battergami");
+    const cc = d.events.filter(e => e.type === "closest_call");
+    document.getElementById("feed").innerHTML =
+      bg.length ? bg.slice(0, 15).map(card).join("") : `<p class="muted">Nothing posted yet.</p>`;
+    document.getElementById("misses").innerHTML =
+      cc.length ? cc.slice(0, 8).map(card).join("") : `<p class="muted">None lately — every recent day had a battergami.</p>`;
+  } catch (e) {
+    document.getElementById("feed").innerHTML = `<p class="muted">Couldn't load the feed.</p>`;
+    document.getElementById("misses").innerHTML = "";
+  }
+})();
+</script>
+</body>
+</html>

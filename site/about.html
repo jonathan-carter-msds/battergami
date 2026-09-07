@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About — Battergami</title>
+<meta name="description" content="How Battergami decides a batting line has never happened before.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>About</h1>
+
+  <p>Every MLB batter's game produces a line of ten stats — at-bats, runs, hits,
+     doubles, triples, home runs, walks, strikeouts, RBIs, and stolen bases.
+     <strong>Battergami</strong> watches every game and checks that line against every
+     batting performance in MLB history, back to 1898. When a player posts a
+     combination of those ten numbers that has <em>never happened before</em> —
+     not once — the bot tweets it. It's the batter analog of
+     <a href="https://pitchergami.com/" target="_blank" rel="noopener">pitchergami</a>,
+     which itself follows NFL <a href="https://nflscorigami.com/" target="_blank" rel="noopener">Scorigami</a>.</p>
+
+  <h2>How "never happened before" is decided</h2>
+  <p>Each batter-game is reduced to a ten-number vector
+     <span class="line">(AB, R, H, 2B, 3B, HR, BB, SO, RBI, SB)</span>.
+     A new game's vector is flagged only if no earlier game in the database has that
+     exact combination. It's an anti-join, not a threshold — there's no "impressive
+     enough" bar, just "has this precise line ever occurred." Lines with no at-bats
+     and no walks (a pinch-runner, say) are ignored.</p>
+
+  <h2>Data</h2>
+  <ul>
+    <li><strong><a href="https://www.retrosheet.org/" target="_blank" rel="noopener">Retrosheet</a></strong>
+        — complete game-by-game history back to the turn of the century, used for the
+        one-time backfill that forms the baseline.</li>
+    <li><strong>MLB Stats API</strong> — official box scores within hours of a game
+        ending, which is what lets the bot post same-day.</li>
+  </ul>
+  <p class="muted">Both feed one table, so the check treats all of history as one continuous record.
+     "First-ever" counts lean toward the dead-ball era on purpose: in 1898 almost every
+     line was new, so players like Honus Wagner and Ty Cobb top the
+     <a href="leaderboard.html">leaderboard</a>.</p>
+
+  <h2>This site</h2>
+  <p>Static pages with no backend. A build script re-queries the database once a day and
+     commits refreshed JSON; the whole "has this line happened" dataset is about 35,000
+     rows, small enough to answer every lookup in your browser. The
+     <a href="check.html">Check a Line</a> tool, <a href="board.html">Board</a>, and
+     <a href="calendar.html">Calendar</a> all run off that one file.</p>
+
+  <h2>Credits</h2>
+  <p>Built by Jonathan Carter. Follow
+     <a href="https://x.com/battergami" target="_blank" rel="noopener">@battergami</a> on Twitter/X.
+     Concept and design cues from Matthew Wolff's pitchergami.</p>
+
+  <p class="gen" id="gen"></p>
+</div>
+
+<script src="assets/app.js"></script>
+<script>
+renderNav("about.html");
+fetchJSON("data/summary.json")
+  .then(s => genLine(document.getElementById("gen"), s.generated_at))
+  .catch(() => {});
+</script>
+</body>
+</html>

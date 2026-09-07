@@ -1,0 +1,18 @@
+# Static site — no build step. Netlify just serves the site/ directory.
+# Connect this repo in Netlify, or run `netlify deploy`.
+
+[build]
+  publish = "site"
+  command = ""
+
+# The generated data files change once a day; let the CDN hold them briefly
+# but always revalidate so a fresh push shows up quickly.
+[[headers]]
+  for = "/data/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=600, must-revalidate"

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Random — Battergami</title>
+<meta name="description" content="A random batting line from the record, and its story.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>Random line</h1>
+  <p class="sub">A random one of the ~35,000 distinct batting lines on record — when it first
+     happened, and how often it's happened since.</p>
+
+  <div id="out"><div class="spinner">Loading…</div></div>
+  <div class="controls"><button id="again" disabled>Another</button></div>
+
+  <p class="gen" id="gen"></p>
+</div>
+
+<script src="assets/app.js"></script>
+<script>
+renderNav("random.html");
+let ROWS = null;
+
+function pick() {
+  const r = ROWS[Math.floor(Math.random() * ROWS.length)];
+  const [, , , , , , , , , , count, fd, fp, fm, ld, lp] = r;
+  const rarity = count === 1 ? "It has happened exactly once."
+    : `It has happened <strong>${commas(count)}</strong> times since 1898.`;
+  document.getElementById("out").innerHTML = `<div class="result seen">
+    <p><span class="line big">${fmtLine(r.slice(0, 10))}</span></p>
+    <p>First done by <strong>${esc(fp)}</strong> on ${fmtDate(fd)}${fm ? " · " + esc(fm) : ""}.</p>
+    <p>${rarity}</p>
+    <p class="muted">Most recent: ${esc(lp)}, ${fmtDate(ld)}.</p>
+    <p><a href="check.html">Check a line of your own &rarr;</a></p>
+  </div>`;
+}
+
+(async () => {
+  try {
+    const d = await fetchJSON("data/lines.json");
+    ROWS = d.rows.filter(r => r[0] > 0);  // skip 0-AB curios
+    genLine(document.getElementById("gen"), d.generated_at);
+    document.getElementById("again").disabled = false;
+    pick();
+  } catch (e) {
+    document.getElementById("out").innerHTML = `<p class="muted">Couldn't load the data.</p>`;
+  }
+})();
+document.getElementById("again").addEventListener("click", () => ROWS && pick());
+</script>
+</body>
+</html>

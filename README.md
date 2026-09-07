@@ -113,3 +113,32 @@ which is the v2 endpoint.
 - **Same-day ties.** If two players post the identical new line on the same
   day, both are flagged (`same_day_ties` column). The pipeline currently
   tweets both separately with a note; you might prefer a combined tweet.
+
+## Website
+
+`site/` is a static dashboard (Latest, Leaderboard, Calendar, Check a Line,
+Board, Random, About).
+There is no backend: all ~35k distinct stat lines in history fit in one JSON
+file, so every lookup runs in the browser.
+
+```bash
+python build_site.py           # re-queries battergami.db -> site/data/*.json
+python -m http.server -d site 8000   # preview at localhost:8000
+```
+
+`build_site.py` writes five files into `site/data/` (committed on purpose):
+`lines.json` (every distinct line + count + first/last occurrence — powers
+Check a Line, Board, Random, Calendar), `leaderboard.json`, `calendar.json`,
+`latest.json` (what the bot actually posted, with tweet links), and
+`summary.json`.
+
+**Keeping it current:** `publish_site.sh` runs the build, commits `site/data/`,
+and pushes. Add it to cron a few minutes after the daily pipeline:
+
+```
+20 5 * * * /Users/jonathancarter/battergami/publish_site.sh >> pipeline.log 2>&1
+```
+
+**Hosting:** connect the GitHub repo in Netlify with publish directory `site/`
+and no build command (see `netlify.toml`), or on Vercel set the output
+directory to `site/`. Each push from `publish_site.sh` triggers a redeploy.

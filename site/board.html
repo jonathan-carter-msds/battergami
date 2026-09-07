@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Board — Battergami</title>
+<meta name="description" content="A grid of every at-bats by hits combination, coloured by average RBI.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>The Board</h1>
+  <p class="sub">Every batting line ever, folded onto an at-bats &times; hits grid.
+     Each square's <strong>colour</strong> is the average RBI for lines in that square;
+     its <strong>opacity</strong> is how common the square is at all (faint = rare).</p>
+
+  <div id="board"><div class="spinner">Loading…</div></div>
+
+  <div class="legend">
+    <span>0 RBI</span><span class="bar"></span><span><span id="cap">4</span>+ RBI</span>
+    <span>·</span><span>faint = rare&nbsp;&nbsp;solid = common</span>
+  </div>
+
+  <p class="gen" id="gen"></p>
+</div>
+
+<div id="tooltip"></div>
+
+<script src="assets/app.js"></script>
+<script>renderNav("board.html");</script>
+<script src="assets/board.js"></script>
+</body>
+</html>

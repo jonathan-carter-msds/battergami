@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Check a Line — Battergami</title>
+<meta name="description" content="Enter a batting line and find out whether it has ever happened in MLB history.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>Check a Line</h1>
+  <p class="sub">Enter a batting line. We'll tell you whether that exact ten-number combination
+     has ever been posted in a game since 1898 — and if so, how often and when it last happened.</p>
+
+  <form id="form" class="checkgrid">
+    <label>AB <input type="number" min="0" max="15" id="ab" value="4"></label>
+    <label>R  <input type="number" min="0" max="15" id="r"  value="0"></label>
+    <label>H  <input type="number" min="0" max="15" id="h"  value="0"></label>
+    <label>2B <input type="number" min="0" max="10" id="d"  value="0"></label>
+    <label>3B <input type="number" min="0" max="10" id="t"  value="0"></label>
+    <label>HR <input type="number" min="0" max="10" id="hr" value="0"></label>
+    <label>BB <input type="number" min="0" max="10" id="bb" value="0"></label>
+    <label>SO <input type="number" min="0" max="10" id="so" value="0"></label>
+    <label>RBI<input type="number" min="0" max="15" id="rbi" value="0"></label>
+    <label>SB <input type="number" min="0" max="10" id="sb" value="0"></label>
+  </form>
+  <div class="controls">
+    <button id="go" disabled>Loading history…</button>
+    <button type="button" class="ghost" id="rand">Surprise me</button>
+  </div>
+
+  <div id="out"></div>
+  <p class="gen" id="gen"></p>
+</div>
+
+<script src="assets/app.js"></script>
+<script>
+renderNav("check.html");
+const IDS = ["ab", "r", "h", "d", "t", "hr", "bb", "so", "rbi", "sb"];
+let MAP = null, ROWS = null;
+
+function key(v) { return v.join(","); }
+
+function readForm() { return IDS.map(id => Math.max(0, parseInt(document.getElementById(id).value || "0", 10))); }
+
+function show(v) {
+  const hit = MAP.get(key(v));
+  const out = document.getElementById("out");
+  const pill = `<span class="line big">${fmtLine(v)}</span>`;
+  if (!hit) {
+    const trivial = v[0] === 0 && v[6] === 0; // no AB, no BB — bot ignores these
+    out.innerHTML = `<div class="result hit">
+      <h3>&#128680; That's a Battergami</h3>
+      <p>${pill}</p>
+      <p>This exact line has <strong>never</strong> been posted in a game since 1898.</p>
+      ${trivial ? `<p class="muted">Heads up: with 0 AB and 0 BB the bot treats this as a non-appearance and skips it.</p>` : ""}
+    </div>`;
+  } else {
+    const [, , , , , , , , , , count, fd, fp, fm, ld, lp] = hit;
+    const times = count === 1 ? "1 time" : `${commas(count)} times`;
+    out.innerHTML = `<div class="result seen">
+      <h3>Already done</h3>
+      <p>${pill}</p>
+      <p>Posted <strong>${times}</strong> since 1898.</p>
+      <p>First: <strong>${esc(fp)}</strong>, ${fmtDate(fd)}${fm ? " · " + esc(fm) : ""}.</p>
+      <p>Most recent: <strong>${esc(lp)}</strong>, ${fmtDate(ld)}.</p>
+    </div>`;
+  }
+}
+
+document.getElementById("form").addEventListener("submit", e => e.preventDefault());
+document.getElementById("go").addEventListener("click", () => { if (MAP) show(readForm()); });
+document.getElementById("rand").addEventListener("click", () => {
+  if (!ROWS) return;
+  const v = ROWS[Math.floor(Math.random() * ROWS.length)].slice(0, 10);
+  IDS.forEach((id, i) => document.getElementById(id).value = v[i]);
+  show(v);
+});
+
+(async () => {
+  try {
+    const d = await fetchJSON("data/lines.json");
+    ROWS = d.rows;
+    MAP = new Map(d.rows.map(r => [key(r.slice(0, 10)), r]));
+    const go = document.getElementById("go");
+    go.disabled = false;
+    go.textContent = "Check this line";
+    genLine(document.getElementById("gen"), d.generated_at);
+  } catch (e) {
+    document.getElementById("go").textContent = "Couldn't load history";
+  }
+})();
+</script>
+</body>
+</html>

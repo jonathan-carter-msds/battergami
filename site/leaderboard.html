@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leaderboard — Battergami</title>
+<meta name="description" content="MLB batters who were first to record the most never-before-seen stat lines.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>Leaderboard</h1>
+  <p class="sub">Batters ranked by how many distinct stat lines they were the <em>first</em> in history to
+     record. Early eras dominate — in 1898 almost every line was new — so this leans
+     toward the dead-ball greats, exactly as you'd expect.</p>
+
+  <div class="controls">
+    <input type="text" id="q" placeholder="Search a batter…" autocomplete="off">
+    <select id="sort">
+      <option value="count">Most first-evers</option>
+      <option value="name">Name A–Z</option>
+      <option value="recent">Most recent</option>
+    </select>
+    <span class="muted" id="count"></span>
+  </div>
+
+  <table>
+    <thead><tr>
+      <th class="no-sort num">#</th>
+      <th class="no-sort">Batter</th>
+      <th class="no-sort num">First-ever lines</th>
+      <th class="no-sort">Span</th>
+    </tr></thead>
+    <tbody id="rows"><tr><td colspan="4" class="spinner">Loading…</td></tr></tbody>
+  </table>
+
+  <p class="gen" id="gen"></p>
+</div>
+
+<script src="assets/app.js"></script>
+<script>
+renderNav("leaderboard.html");
+let DATA = [];
+
+function render() {
+  const q = document.getElementById("q").value.trim().toLowerCase();
+  const sort = document.getElementById("sort").value;
+  let rows = DATA.map((r, i) => ({ rank: i + 1, name: r[0], n: r[1], first: r[2], last: r[3] }));
+  if (q) rows = rows.filter(r => r.name.toLowerCase().includes(q));
+  if (sort === "name") rows.sort((a, b) => a.name.localeCompare(b.name));
+  else if (sort === "recent") rows.sort((a, b) => b.last - a.last || b.n - a.n);
+  document.getElementById("count").textContent = `${rows.length} batter${rows.length === 1 ? "" : "s"}`;
+  document.getElementById("rows").innerHTML = rows.map(r => `
+    <tr>
+      <td class="num">${r.rank}</td>
+      <td>${esc(r.name)}</td>
+      <td class="num">${r.n}</td>
+      <td class="muted">${r.first}–${r.last}</td>
+    </tr>`).join("") || `<tr><td colspan="4" class="muted">No match.</td></tr>`;
+}
+
+(async () => {
+  try {
+    const d = await fetchJSON("data/leaderboard.json");
+    DATA = d.rows;
+    render();
+    genLine(document.getElementById("gen"), d.generated_at);
+  } catch (e) {
+    document.getElementById("rows").innerHTML = `<tr><td colspan="4" class="muted">Couldn't load the leaderboard.</td></tr>`;
+  }
+})();
+document.getElementById("q").addEventListener("input", render);
+document.getElementById("sort").addEventListener("change", render);
+</script>
+</body>
+</html>

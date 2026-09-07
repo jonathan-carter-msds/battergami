@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calendar — Battergami</title>
+<meta name="description" content="Browse the days new batting lines entered the record, 1898 to today.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>Calendar</h1>
+  <p class="sub">Each highlighted day is one on which at least one batting line was posted for the
+     first time in history. Pick a season, then click a day to see which lines.</p>
+
+  <div class="controls">
+    <label>Season <select id="year"></select></label>
+    <span class="muted" id="ysum"></span>
+  </div>
+
+  <div class="cal-months" id="months"><div class="spinner">Loading…</div></div>
+
+  <div id="day"></div>
+  <p class="gen" id="gen"></p>
+</div>
+
+<script src="assets/app.js"></script>
+<script>
+renderNav("calendar.html");
+const MON = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+let COUNTS = {}, LINES = null;
+
+function daysInMonth(y, m) { return new Date(y, m + 1, 0).getDate(); }
+
+function renderYear(y) {
+  const host = document.getElementById("months");
+  let total = 0, out = "";
+  for (let m = 0; m < 12; m++) {
+    const first = new Date(y, m, 1).getDay();
+    let cells = "";
+    for (let i = 0; i < first; i++) cells += `<div class="d pad"></div>`;
+    for (let d = 1; d <= daysInMonth(y, m); d++) {
+      const iso = `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      const n = COUNTS[iso] || 0;
+      total += n;
+      cells += n
+        ? `<div class="d has" data-iso="${iso}" title="${n} new line${n === 1 ? "" : "s"}">${d}</div>`
+        : `<div class="d">${d}</div>`;
+    }
+    out += `<div class="month"><h3>${MON[m]}</h3><div class="grid">${cells}</div></div>`;
+  }
+  host.innerHTML = out;
+  document.getElementById("ysum").textContent = `${commas(total)} new line${total === 1 ? "" : "s"} in ${y}`;
+  host.querySelectorAll(".d.has").forEach(el =>
+    el.addEventListener("click", () => showDay(el.dataset.iso)));
+}
+
+async function showDay(iso) {
+  const host = document.getElementById("day");
+  host.innerHTML = `<h2>${fmtDate(iso)}</h2><p class="spinner">Loading lines…</p>`;
+  if (!LINES) {
+    try { LINES = (await fetchJSON("data/lines.json")).rows; }
+    catch (e) { host.innerHTML = `<h2>${fmtDate(iso)}</h2><p class="muted">Couldn't load line detail.</p>`; return; }
+  }
+  const hits = LINES.filter(r => r[11] === iso);
+  host.innerHTML = `<h2>${fmtDate(iso)} — ${hits.length} first-ever line${hits.length === 1 ? "" : "s"}</h2>` +
+    `<div class="feed">` + hits.map(r => `
+      <div class="card">
+        <div class="top"><span class="who">${esc(r[12])}</span>
+          <span class="meta">${esc(r[13] || "")}</span></div>
+        <span class="line">${fmtLine(r.slice(0, 10))}</span>
+        <div class="foot">since posted ${r[10] === 1 ? "once" : commas(r[10]) + " times"} ·
+          last ${fmtDate(r[14])} by ${esc(r[15])}</div>
+      </div>`).join("") + `</div>`;
+  host.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+(async () => {
+  try {
+    const d = await fetchJSON("data/calendar.json");
+    COUNTS = d.counts;
+    genLine(document.getElementById("gen"), d.generated_at);
+    const years = [...new Set(Object.keys(COUNTS).map(k => +k.slice(0, 4)))].sort((a, b) => b - a);
+    const sel = document.getElementById("year");
+    sel.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join("");
+    sel.addEventListener("change", () => { document.getElementById("day").innerHTML = ""; renderYear(+sel.value); });
+    renderYear(years[0]);
+  } catch (e) {
+    document.getElementById("months").innerHTML = `<p class="muted">Couldn't load the calendar.</p>`;
+  }
+})();
+</script>
+</body>
+</html>
