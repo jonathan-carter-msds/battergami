@@ -1,8 +1,9 @@
 name: Deploy site to Cloudflare Pages
 
 # Publishes site/ to the "battergami" Cloudflare Pages project on every push
-# to main. Requires two repo secrets (set via `gh secret set`, never
-# committed): CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID.
+# to main, via `wrangler pages deploy` (cloudflare/pages-action is archived).
+# Requires two repo secrets (set via `gh secret set`, never committed):
+# CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID.
 # Free tier: 500 builds/month, no credit system -- this repo uses ~30/month.
 
 on:
@@ -21,10 +22,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
+        uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: battergami
-          directory: site
-          branch: main
+          command: pages deploy site --project-name=battergami --branch=main
