@@ -1,0 +1,43 @@
+name: Deploy site to GitHub Pages
+
+# Publishes site/ (the static dashboard) to GitHub Pages on every push to
+# main -- including the nightly commit from publish_site.sh. No billing
+# tier, no credits: Actions minutes are free and unlimited for public repos.
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:   # lets you trigger a deploy manually from the Actions tab
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one deploy at a time; let an in-flight one finish rather than cancel it,
+# so a fast-follow push doesn't clobber a deploy that's already publishing.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload site/ as the Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "site"
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
