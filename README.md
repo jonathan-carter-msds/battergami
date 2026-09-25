@@ -1,5 +1,7 @@
 # battergami
 
+**Live dashboard: [battergami.com](https://battergami.com)**
+
 Every MLB batter's plate appearance produces a line of ten stats — at-bats,
 runs, hits, doubles, triples, home runs, walks, strikeouts, RBIs, and stolen
 bases. Battergami watches every game and checks that line against every
@@ -134,12 +136,16 @@ Check a Line, Board, Random, Calendar), `leaderboard.json`, `calendar.json`,
 `summary.json`.
 
 **Keeping it current:** `publish_site.sh` runs the build, commits `site/data/`,
-and pushes. Add it to cron a few minutes after the daily pipeline:
+and pushes. Cron runs it nightly:
 
 ```
-20 5 * * * /Users/jonathancarter/battergami/publish_site.sh >> pipeline.log 2>&1
+30 2 * * * /Users/jonathancarter/battergami/publish_site.sh >> pipeline.log 2>&1
 ```
 
-**Hosting:** connect the GitHub repo in Netlify with publish directory `site/`
-and no build command (see `netlify.toml`), or on Vercel set the output
-directory to `site/`. Each push from `publish_site.sh` triggers a redeploy.
+**Hosting:** [battergami.com](https://battergami.com) is served by **Cloudflare
+Pages**, deployed by [`.github/workflows/cloudflare-pages.yml`](.github/workflows/cloudflare-pages.yml)
+on every push to `main` — no billing tier, no build minutes to run out of.
+Two free mirrors redeploy the same way and stay in sync automatically:
+
+- GitHub Pages — [`.github/workflows/pages.yml`](.github/workflows/pages.yml) → `jonathan-carter-msds.github.io/battergami/`
+- Netlify — `netlify.toml`, publish dir `site/` → `battergami.netlify.app` (currently paused on the free plan's monthly credits; not the canonical URL)
