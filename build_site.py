@@ -72,43 +72,51 @@ def build_lines(conn: sqlite3.Connection) -> list:
     # aggregate plus ~35k x 2 individual per-vector point lookups this used to
     # do. Point lookups are fine when the whole DB fits in page cache (a
     # laptop with plenty of RAM) but turn into ~70k random disk seeks on a
-    # memory-constrained host, which can take a very long time. A single
-    # sorted window-function pass is sequential I/O instead of random I/O, so
-    # it stays fast regardless of how much RAM is available to cache the file.
+    # memory-constrained host, which can take a very long time.
     #
-    # rn_first=1 marks each vector's earliest game; rn_last=1 marks its most
-    # recent. Both tiebreak same-date ties by lowest game_id ASC -- matching
-    # the old code's ORDER BY game_id LIMIT 1, which used that same ascending
-    # order for both the first- and last-occurrence lookups. Filtering to
-    # rows that are either the first or the last occurrence (at most 2 rows
-    # per vector) keeps the final GROUP BY cheap even though the window pass
-    # itself scans everything.
+    # A first version of this used two separately-ordered window functions
+    # (ASC for first-occurrence, DESC for last-occurrence) plus an outer
+    # GROUP BY -- correct, but EXPLAIN QUERY PLAN showed SQLite materializing
+    # three separate full-table temp b-trees (one per differently-ordered
+    # window, one for the GROUP BY), which was still very slow on a
+    # memory-constrained host. Reusing a single named window `w` (one
+    # ordering only) for every FIRST_VALUE/LAST_VALUE/COUNT call, and
+    # filtering to each partition's own row 1 instead of a separate GROUP BY,
+    # collapses that down to exactly one sort -- confirmed via EXPLAIN QUERY
+    # PLAN and cross-checked row-for-row against the old (slow) query's
+    # output for correctness.
+    #
+    # This does change the tiebreak for "last occurrence" when several real
+    # (guard-passing) players share a vector's exact same most-recent date:
+    # the old code broke such ties by lowest game_id in both directions; this
+    # single ascending sort necessarily breaks the *last* side by highest
+    # game_id instead. Both are equally arbitrary choices among genuine ties
+    # -- cosmetic only, not a correctness issue.
     query = f"""
         WITH ranked AS (
             SELECT
-                {sel}, game_date, player_name, away_team, home_team,
-                ROW_NUMBER() OVER (
-                    PARTITION BY {sel} ORDER BY game_date ASC, game_id ASC
-                ) AS rn_first,
-                ROW_NUMBER() OVER (
-                    PARTITION BY {sel} ORDER BY game_date DESC, game_id ASC
-                ) AS rn_last,
+                {sel},
+                FIRST_VALUE(game_date) OVER w AS first_date,
+                FIRST_VALUE(player_name) OVER w AS first_player,
+                FIRST_VALUE(away_team) OVER w AS first_away,
+                FIRST_VALUE(home_team) OVER w AS first_home,
+                LAST_VALUE(game_date) OVER (
+                    w ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+                ) AS last_date,
+                LAST_VALUE(player_name) OVER (
+                    w ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+                ) AS last_player,
+                ROW_NUMBER() OVER w AS rn,
                 COUNT(*) OVER (PARTITION BY {sel}) AS cnt
             FROM batter_game_lines
             WHERE {guard}
+            WINDOW w AS (PARTITION BY {sel} ORDER BY game_date ASC, game_id ASC)
         )
         SELECT
-            {sel},
-            MAX(cnt) AS c,
-            MAX(CASE WHEN rn_first = 1 THEN game_date END) AS first_date,
-            MAX(CASE WHEN rn_first = 1 THEN player_name END) AS first_player,
-            MAX(CASE WHEN rn_first = 1 THEN away_team END) AS first_away,
-            MAX(CASE WHEN rn_first = 1 THEN home_team END) AS first_home,
-            MAX(CASE WHEN rn_last = 1 THEN game_date END) AS last_date,
-            MAX(CASE WHEN rn_last = 1 THEN player_name END) AS last_player
+            {sel}, cnt, first_date, first_player, first_away, first_home,
+            last_date, last_player
         FROM ranked
-        WHERE rn_first = 1 OR rn_last = 1
-        GROUP BY {sel}
+        WHERE rn = 1
     """
     agg = conn.execute(query).fetchall()
 
@@ -118,7 +126,7 @@ def build_lines(conn: sqlite3.Connection) -> list:
         matchup = f"{r['first_away']} @ {r['first_home']}" if r["first_home"] else ""
         rows.append([
             *vec,
-            r["c"],
+            r["cnt"],
             r["first_date"],
             r["first_player"],
             matchup,
