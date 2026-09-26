@@ -68,42 +68,62 @@ def build_lines(conn: sqlite3.Connection) -> list:
     # Same "not a trivial no-op appearance" guard the detection query uses.
     guard = "ab > 0 OR bb > 0 OR hbp > 0"
 
-    agg = conn.execute(
-        f"""
-        SELECT {sel}, COUNT(*) AS c,
-               MIN(game_date) AS first_date, MAX(game_date) AS last_date
-        FROM batter_game_lines
-        WHERE {guard}
+    # One pass over the table using window functions, instead of the GROUP BY
+    # aggregate plus ~35k x 2 individual per-vector point lookups this used to
+    # do. Point lookups are fine when the whole DB fits in page cache (a
+    # laptop with plenty of RAM) but turn into ~70k random disk seeks on a
+    # memory-constrained host, which can take a very long time. A single
+    # sorted window-function pass is sequential I/O instead of random I/O, so
+    # it stays fast regardless of how much RAM is available to cache the file.
+    #
+    # rn_first=1 marks each vector's earliest game; rn_last=1 marks its most
+    # recent. Both tiebreak same-date ties by lowest game_id ASC -- matching
+    # the old code's ORDER BY game_id LIMIT 1, which used that same ascending
+    # order for both the first- and last-occurrence lookups. Filtering to
+    # rows that are either the first or the last occurrence (at most 2 rows
+    # per vector) keeps the final GROUP BY cheap even though the window pass
+    # itself scans everything.
+    query = f"""
+        WITH ranked AS (
+            SELECT
+                {sel}, game_date, player_name, away_team, home_team,
+                ROW_NUMBER() OVER (
+                    PARTITION BY {sel} ORDER BY game_date ASC, game_id ASC
+                ) AS rn_first,
+                ROW_NUMBER() OVER (
+                    PARTITION BY {sel} ORDER BY game_date DESC, game_id ASC
+                ) AS rn_last,
+                COUNT(*) OVER (PARTITION BY {sel}) AS cnt
+            FROM batter_game_lines
+            WHERE {guard}
+        )
+        SELECT
+            {sel},
+            MAX(cnt) AS c,
+            MAX(CASE WHEN rn_first = 1 THEN game_date END) AS first_date,
+            MAX(CASE WHEN rn_first = 1 THEN player_name END) AS first_player,
+            MAX(CASE WHEN rn_first = 1 THEN away_team END) AS first_away,
+            MAX(CASE WHEN rn_first = 1 THEN home_team END) AS first_home,
+            MAX(CASE WHEN rn_last = 1 THEN game_date END) AS last_date,
+            MAX(CASE WHEN rn_last = 1 THEN player_name END) AS last_player
+        FROM ranked
+        WHERE rn_first = 1 OR rn_last = 1
         GROUP BY {sel}
-        """
-    ).fetchall()
-
-    # Attach the player/matchup for the first occurrence and the player for the
-    # most recent occurrence. One indexed lookup per vector (~35k); a few seconds.
-    where_vec = " AND ".join(f"{c} = ?" for c in LINE_COLS)
-    first_stmt = (
-        f"SELECT player_name, away_team, home_team FROM batter_game_lines "
-        f"WHERE game_date = ? AND {where_vec} ORDER BY game_id LIMIT 1"
-    )
-    last_stmt = (
-        f"SELECT player_name FROM batter_game_lines "
-        f"WHERE game_date = ? AND {where_vec} ORDER BY game_id LIMIT 1"
-    )
+    """
+    agg = conn.execute(query).fetchall()
 
     rows = []
     for r in agg:
         vec = [r[c] for c in LINE_COLS]
-        f = conn.execute(first_stmt, [r["first_date"], *vec]).fetchone()
-        l = conn.execute(last_stmt, [r["last_date"], *vec]).fetchone()
-        matchup = f"{f['away_team']} @ {f['home_team']}" if f and f["home_team"] else ""
+        matchup = f"{r['first_away']} @ {r['first_home']}" if r["first_home"] else ""
         rows.append([
             *vec,
             r["c"],
             r["first_date"],
-            f["player_name"] if f else "",
+            r["first_player"],
             matchup,
             r["last_date"],
-            l["player_name"] if l else "",
+            r["last_player"],
         ])
 
     rows.sort(key=lambda x: (x[10], x[0:10]))  # by first_date, then vector
