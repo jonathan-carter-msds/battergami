@@ -7,12 +7,16 @@
 --
 -- The "performance vector" is (ab, h, doubles, triples, hr, bb, so, rbi, sb).
 -- Two lines are considered the same performance if all nine values match
--- exactly, regardless of player, team, or era.
+-- exactly, regardless of player, team, or era. Regular season only -- both
+-- the candidate game and everything it's compared against are restricted to
+-- game_type = 'regular', so a postseason or All-Star line never counts as
+-- (or is measured against) a battergami.
 
 WITH new_games AS (
     SELECT *
     FROM batter_game_lines
     WHERE game_date = :target_date
+      AND game_type = 'regular'
 ),
 
 -- guard against trivial "everything zero" lines (e.g. a pinch-hit walk-off
@@ -30,6 +34,7 @@ first_ever AS (
         SELECT 1
         FROM batter_game_lines hist
         WHERE hist.game_date < c.game_date
+          AND hist.game_type = 'regular'
           AND hist.ab       = c.ab
           AND hist.r        = c.r
           AND hist.h        = c.h

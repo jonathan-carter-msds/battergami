@@ -71,8 +71,9 @@ def write_json(name: str, payload: dict) -> None:
 def build_lines(conn: sqlite3.Connection) -> list:
     print("building lines.json ...")
     sel = ",".join(LINE_COLS)
-    # Same "not a trivial no-op appearance" guard the detection query uses.
-    guard = "ab > 0 OR bb > 0 OR hbp > 0"
+    # Same "not a trivial no-op appearance" guard the detection query uses,
+    # plus regular-season-only, matching detection_query.sql.
+    guard = "(ab > 0 OR bb > 0 OR hbp > 0) AND game_type = 'regular'"
 
     # One pass over the table using window functions, instead of the GROUP BY
     # aggregate plus ~35k x 2 individual per-vector point lookups this used to
@@ -164,14 +165,14 @@ def build_leaderboard(conn: sqlite3.Connection, top_n: int = 300) -> list:
         WITH firsts AS (
             SELECT {sel}, MIN(game_date) AS fd
             FROM batter_game_lines
-            WHERE ab > 0 OR bb > 0 OR hbp > 0
+            WHERE (ab > 0 OR bb > 0 OR hbp > 0) AND game_type = 'regular'
             GROUP BY {sel}
         )
         SELECT b.player_name AS name, COUNT(*) AS n,
                MIN(f.fd) AS first, MAX(f.fd) AS last
         FROM firsts f
         JOIN batter_game_lines b
-          ON b.game_date = f.fd AND {on}
+          ON b.game_date = f.fd AND b.game_type = 'regular' AND {on}
         GROUP BY b.player_name
         ORDER BY n DESC, b.player_name ASC
         LIMIT ?
@@ -269,11 +270,13 @@ def _count(conn: sqlite3.Connection, table: str) -> int:
 
 def build_summary(conn: sqlite3.Connection, lines_rows: list, latest: list) -> dict:
     print("building summary.json ...")
+    # Regular season only, matching detection_query.sql -- keeps every number
+    # on this tile row telling the same consistent (regular-season) story.
     span = conn.execute(
-        "SELECT MIN(game_date) a, MAX(game_date) b FROM batter_game_lines"
+        "SELECT MIN(game_date) a, MAX(game_date) b FROM batter_game_lines WHERE game_type = 'regular'"
     ).fetchone()
     total_games = conn.execute(
-        "SELECT COUNT(*) n FROM batter_game_lines"
+        "SELECT COUNT(*) n FROM batter_game_lines WHERE game_type = 'regular'"
     ).fetchone()["n"]
 
     # All-time genuine battergami posts, counted directly (latest[] is capped).

@@ -210,12 +210,17 @@ def run_detection(target_date: date) -> list[sqlite3.Row]:
 # ---------------------------------------------------------------------------
 
 def count_unique_lines(conn: sqlite3.Connection) -> int:
-    """All-time count of distinct stat-line combinations seen in the database."""
+    """All-time count of distinct stat-line combinations seen in the database.
+
+    Regular season only, matching detection_query.sql -- a postseason or
+    All-Star line (if one is ever ingested) doesn't count toward this.
+    """
     row = conn.execute(
         """
         SELECT COUNT(*) AS n FROM (
             SELECT DISTINCT ab, r, h, doubles, triples, hr, bb, so, rbi, sb
             FROM batter_game_lines
+            WHERE game_type = 'regular'
         )
         """
     ).fetchone()

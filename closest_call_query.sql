@@ -7,7 +7,8 @@
 -- 1940-05-05 by Emery Adams").
 
 WITH new_games AS (
-    SELECT * FROM batter_game_lines WHERE game_date = :target_date
+    SELECT * FROM batter_game_lines
+    WHERE game_date = :target_date AND game_type = 'regular'
 ),
 
 candidate_games AS (
@@ -20,6 +21,7 @@ scored AS (
         (
             SELECT COUNT(*) FROM batter_game_lines hist
             WHERE hist.game_date < c.game_date
+              AND hist.game_type = 'regular'
               AND hist.ab = c.ab AND hist.r = c.r AND hist.h = c.h
               AND hist.doubles = c.doubles AND hist.triples = c.triples
               AND hist.hr = c.hr AND hist.bb = c.bb AND hist.so = c.so
@@ -28,6 +30,7 @@ scored AS (
         (
             SELECT MAX(hist.game_date) FROM batter_game_lines hist
             WHERE hist.game_date < c.game_date
+              AND hist.game_type = 'regular'
               AND hist.ab = c.ab AND hist.r = c.r AND hist.h = c.h
               AND hist.doubles = c.doubles AND hist.triples = c.triples
               AND hist.hr = c.hr AND hist.bb = c.bb AND hist.so = c.so
@@ -36,6 +39,7 @@ scored AS (
         (
             SELECT hist.player_name FROM batter_game_lines hist
             WHERE hist.game_date < c.game_date
+              AND hist.game_type = 'regular'
               AND hist.ab = c.ab AND hist.r = c.r AND hist.h = c.h
               AND hist.doubles = c.doubles AND hist.triples = c.triples
               AND hist.hr = c.hr AND hist.bb = c.bb AND hist.so = c.so
@@ -45,6 +49,10 @@ scored AS (
     FROM candidate_games c
 )
 
+-- Regular season only, matching detection_query.sql -- both the candidate
+-- game and everything it's compared against are restricted to
+-- game_type = 'regular'.
+--
 -- occurrence_count > 0 is the key filter: if it were 0, this would already
 -- have been caught as a genuine battergami by detection_query.sql instead.
 SELECT *

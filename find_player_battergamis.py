@@ -65,10 +65,12 @@ def find_player_battergamis(player_name: str):
             SELECT bgl.*
             FROM batter_game_lines bgl
             WHERE bgl.player_id = ?
+              AND bgl.game_type = 'regular'
               AND (bgl.ab > 0 OR bgl.bb > 0 OR bgl.hbp > 0)
               AND NOT EXISTS (
                   SELECT 1 FROM batter_game_lines hist
                   WHERE hist.game_date < bgl.game_date
+                    AND hist.game_type = 'regular'
                     AND hist.ab = bgl.ab AND hist.r = bgl.r AND hist.h = bgl.h
                     AND hist.doubles = bgl.doubles AND hist.triples = bgl.triples
                     AND hist.hr = bgl.hr AND hist.bb = bgl.bb AND hist.so = bgl.so
