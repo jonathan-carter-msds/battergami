@@ -306,28 +306,85 @@ def build_summary(conn: sqlite3.Connection, lines_rows: list, latest: list) -> d
 
 
 # ---------------------------------------------------------------------------
+# --fast mode: latest.json + summary.json ONLY, run every hour right after
+# the bot checks for a new tweet, so the site reflects a new battergami
+# within minutes instead of waiting for the next nightly full rebuild.
+#
+# Every query here is either on a small table (tweeted_performances etc,
+# ~hundreds of rows) or an indexed MIN/MAX seek -- confirmed via
+# EXPLAIN QUERY PLAN, since this build_summary's season_count join looked
+# cheap but actually planned as a full 5.6M-row scan (SQLite chose to drive
+# the join from the big table because of the strftime() filter on it).
+# Fields that genuinely require a full-table scan (distinct_lines,
+# total_games_scanned, coverage_end) are carried forward from the last
+# nightly full build instead of recomputed -- they only need to be right to
+# within a day, unlike season_count/posted_total/last_event, which reflect
+# a specific new tweet and are what a viewer actually came to check.
+# ---------------------------------------------------------------------------
+
+def build_summary_fast(conn: sqlite3.Connection, latest: list) -> dict:
+    print("building summary.json (fast) ...")
+    try:
+        with open(os.path.join(OUT_DIR, "summary.json")) as f:
+            prev = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        prev = {}
+
+    posted_total = (_count(conn, "tweeted_performances")
+                    + _count(conn, "allstar_tweeted_performances"))
+    genuine = [e for e in latest if e["type"] == "battergami"]
+    this_year = date.today().year
+    # Proxy for "posted for a game in this calendar year": tweeted_at's year
+    # instead of a join to game_date. Single small-table scan, no join to
+    # batter_game_lines at all. Off by one only for a game within a few hours
+    # of a year boundary getting tweeted the next calendar day -- corrected
+    # by the next nightly full rebuild either way.
+    season_count = conn.execute(
+        "SELECT COUNT(*) AS n FROM tweeted_performances WHERE strftime('%Y', tweeted_at) = ?",
+        (str(this_year),),
+    ).fetchone()["n"]
+
+    return {
+        "generated_at": now_iso(),
+        "distinct_lines": prev.get("distinct_lines"),
+        "total_games_scanned": prev.get("total_games_scanned"),
+        "coverage_start": prev.get("coverage_start"),
+        "coverage_end": prev.get("coverage_end"),
+        "season_year": this_year,
+        "season_count": season_count,
+        "posted_total": posted_total,
+        "last_event": genuine[0] if genuine else prev.get("last_event"),
+    }
+
+
+# ---------------------------------------------------------------------------
 
 def main() -> None:
-    print(f"reading {DB_PATH}")
+    fast = "--fast" in sys.argv
+    print(f"reading {DB_PATH}{' (fast mode)' if fast else ''}")
     conn = get_conn()
     try:
-        lines_rows = build_lines(conn)
-        leaderboard = build_leaderboard(conn)
-        calendar = build_calendar(lines_rows)
         latest = build_latest(conn)
-        summary = build_summary(conn, lines_rows, latest)
+        if fast:
+            summary = build_summary_fast(conn, latest)
+        else:
+            lines_rows = build_lines(conn)
+            leaderboard = build_leaderboard(conn)
+            calendar = build_calendar(lines_rows)
+            summary = build_summary(conn, lines_rows, latest)
     finally:
         conn.close()
 
     gen = now_iso()
-    write_json("lines.json", {"generated_at": gen, "fields": LINES_FIELDS,
-                              "labels": LINE_LABELS, "rows": lines_rows})
-    write_json("leaderboard.json", {"generated_at": gen,
-                                    "fields": ["name", "count", "first_year", "last_year"],
-                                    "rows": leaderboard})
-    write_json("calendar.json", {"generated_at": gen, "counts": calendar})
     write_json("latest.json", {"generated_at": gen, "events": latest})
     write_json("summary.json", summary)
+    if not fast:
+        write_json("lines.json", {"generated_at": gen, "fields": LINES_FIELDS,
+                                  "labels": LINE_LABELS, "rows": lines_rows})
+        write_json("leaderboard.json", {"generated_at": gen,
+                                        "fields": ["name", "count", "first_year", "last_year"],
+                                        "rows": leaderboard})
+        write_json("calendar.json", {"generated_at": gen, "counts": calendar})
     print("done.")
 
 
