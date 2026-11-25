@@ -57,6 +57,18 @@ def now_iso() -> str:
 def write_json(name: str, payload: dict) -> None:
     os.makedirs(OUT_DIR, exist_ok=True)
     path = os.path.join(OUT_DIR, name)
+    # Leave the file untouched when nothing but generated_at would change, so
+    # the publish scripts' `git diff --quiet` sees no change and skips the
+    # commit/push (and the deploys it triggers) on days with no new data.
+    try:
+        with open(path) as f:
+            old = json.load(f)
+        strip = lambda d: {k: v for k, v in d.items() if k != "generated_at"}
+        if strip(old) == strip(json.loads(json.dumps(payload))):
+            print(f"  unchanged {name:16s} (kept existing file)")
+            return
+    except (OSError, ValueError, AttributeError):
+        pass
     with open(path, "w") as f:
         json.dump(payload, f, separators=(",", ":"))
     size = os.path.getsize(path)
